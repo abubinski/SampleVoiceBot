@@ -1,8 +1,9 @@
 class UserProfile {
-	constructor(uid, first, last, age, address, phone) {
+	constructor(uid, intent, first, last, age, address, phone) {
 		this.uid = uid;
-		this.first = first;
-		this.last = last;
+		this.intent = intent;
+		this.firstName = first;
+		this.lastName = last;
 		this.age = age;
 		this.address = address;
 		this.phone = phone;
