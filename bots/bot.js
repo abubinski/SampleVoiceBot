@@ -30,7 +30,7 @@ class MyBot extends ActivityHandler {
 				for (let i in context.activity.membersAdded) {
 					// Send greeting when bot enters the converesation instead of waiting for user.
 					if (context.activity.membersAdded[i].id !== context.activity.recipient.id) {
-						await context.sendActivity("Hi, Welcome to Walgreens!");
+						await context.sendActivity("Hi, Welcome to Contoso Drive-Thru!");
 
 						// Begin prompting for information.
 						await this.dialog.run(context, this.dialogState);
