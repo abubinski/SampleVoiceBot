@@ -1,12 +1,7 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
 const dotenv = require("dotenv");
 const path = require("path");
 const restify = require("restify");
-
-// Import required bot services.
-// See https://aka.ms/bot-services to learn more about the different parts of a bot.
 const {
 	BotFrameworkAdapter,
 	MemoryStorage,
@@ -14,7 +9,6 @@ const {
 	UserState
 } = require("botbuilder");
 
-// This bot's main dialog.
 const { MyBot } = require("./bots/bot");
 const { UserProfileDialog } = require("./dialogs/userProfileDialog");
 
@@ -62,7 +56,6 @@ const myBot = new MyBot(conversationState, userState, myUserProfileDialog);
 server.post("/api/messages", (req, res) => {
 	adapter.processActivity(req, res, async context => {
 		// Route to main dialog.
-		// await myBot.onTurn(context);
 		await myBot.run(context);
 	});
 });

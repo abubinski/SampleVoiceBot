@@ -2,7 +2,7 @@ module.exports = {
 	extends: "standard",
 	rules: {
 		semi: [2, "always"],
-		indent: [2, "tab"],
+		indent: [2, "tab", { "SwitchCase": 1 }],
 		"no-return-await": 0,
 		"no-tabs": 0,
 		quotes: ["error", "double"],

@@ -7,9 +7,11 @@ const {
 } = require("botbuilder-dialogs");
 
 const { UserProfile } = require("../models/userProfile");
+const { LuisRecognizer } = require("botbuilder-ai");
 
 // Dialog IDs
 const GET_USER_PROFILE = "GET_USER_PROFILE";
+const GET_USER_INTENT = "GET_USER_INTENT";
 
 // Prompt IDs
 const INTENT_PROMPT = "INTENT_PROMPT";
@@ -25,6 +27,12 @@ class UserProfileDialog extends ComponentDialog {
 
 		this.userProfile = new UserProfile();
 
+		this.luisRecognizer = new LuisRecognizer({
+			applicationId: process.env.LuisAppId,
+			endpointKey: process.env.LuisKey,
+			endpoint: "https://westus.api.cognitive.microsoft.com"
+		});
+
 		// Register individual prompts that make up our larger Dialog
 		this.addDialog(new TextPrompt(INTENT_PROMPT));
 		this.addDialog(new TextPrompt(LAST_NAME_PROMPT));
@@ -32,16 +40,20 @@ class UserProfileDialog extends ComponentDialog {
 		this.addDialog(new TextPrompt(ADDRESS_PROMPT));
 		this.addDialog(new TextPrompt(PHONE_PROMPT));
 
+		this.addDialog(new WaterfallDialog(GET_USER_INTENT, [
+			this.getIntent.bind(this),
+			this.processIntent.bind(this)
+		]));
+
 		// Register WaterfallDialog that will send the registered prompts
 		this.addDialog(new WaterfallDialog(GET_USER_PROFILE, [
-			this.getIntent.bind(this),
 			this.getLastName.bind(this),
 			this.getFirstName.bind(this),
 			this.collectAndDisplayName.bind(this)
 		]));
 
 		// See https://docs.microsoft.com/en-us/javascript/api/botbuilder-dialogs/componentdialog?view=botbuilder-ts-latest#method-details
-		this.initialDialogId = GET_USER_PROFILE;
+		this.initialDialogId = GET_USER_INTENT;
 	}
 
 	async run(turnContext, dialogState) {
@@ -60,9 +72,25 @@ class UserProfileDialog extends ComponentDialog {
 		return await step.prompt(INTENT_PROMPT, "How can I help you?");
 	}
 
+	async processIntent(step) {
+		let result = await this.luisRecognizer.recognize(step.context);
+		let intent = LuisRecognizer.topIntent(result);
+
+		switch (intent) {
+			case "OrderPickup":
+				await step.context.sendActivity("Sure thing, we'll just need you to answer a few questions first.");
+				return await step.beginDialog(GET_USER_PROFILE);
+			case "SpeakToPharmacist":
+				await step.context.sendActivity("Got it, someone will be with you right away.");
+				break;
+			default:
+				await step.context.sendActivity("Sorry, I didn't understand that.");
+				break;
+		}
+		return await step.endDialog();
+	}
+
 	async getLastName(step) {
-		this.userProfile.intent = step.result;
-		await step.context.sendActivity("Great, let's get your " + this.userProfile.intent + " started.");
 		return await step.prompt(LAST_NAME_PROMPT, "What is your last name?");
 	}
 
