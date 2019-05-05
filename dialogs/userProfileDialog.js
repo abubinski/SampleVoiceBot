@@ -33,9 +33,15 @@ class UserProfileDialog extends ComponentDialog {
 			endpoint: "https://westus.api.cognitive.microsoft.com"
 		});
 
+		this.nameValidator = async (step) => {
+			let result = await this.luisRecognizer.recognize(step.context);
+			console.log(result);
+			return result.entities.Name !== undefined;
+		};
+
 		// Register individual prompts that make up our larger Dialog
 		this.addDialog(new TextPrompt(INTENT_PROMPT));
-		this.addDialog(new TextPrompt(LAST_NAME_PROMPT));
+		this.addDialog(new TextPrompt(LAST_NAME_PROMPT, this.nameValidator));
 		this.addDialog(new TextPrompt(FIRST_NAME_PROMPT));
 		this.addDialog(new TextPrompt(ADDRESS_PROMPT));
 		this.addDialog(new TextPrompt(PHONE_PROMPT));
@@ -90,6 +96,8 @@ class UserProfileDialog extends ComponentDialog {
 		}
 		return await step.endDialog();
 	}
+
+
 
 	async getLastName(step) {
 		return await step.prompt(LAST_NAME_PROMPT, "What is your last name?");
