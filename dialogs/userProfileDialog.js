@@ -7,6 +7,7 @@ const {
 } = require("botbuilder-dialogs");
 
 const { UserProfile } = require("../models/userProfile");
+// const { DialogValidators } = require("./dialogValidators");
 const { LuisRecognizer } = require("botbuilder-ai");
 
 // Dialog IDs
@@ -33,16 +34,21 @@ class UserProfileDialog extends ComponentDialog {
 			endpoint: "https://westus.api.cognitive.microsoft.com"
 		});
 
-		this.nameValidator = async (step) => {
+		// to save userprofile info here need two separaate validators
+		this.nameValidateAndStore = async (step) => {
 			let result = await this.luisRecognizer.recognize(step.context);
-			console.log(result);
-			return result.entities.Name !== undefined;
+			if (result.entities.Name !== undefined) {
+				return true;
+			} else {
+				await step.context.sendActivity("Sorry, I didn't understand that. Please try again.");
+				return false;
+			}
 		};
 
 		// Register individual prompts that make up our larger Dialog
 		this.addDialog(new TextPrompt(INTENT_PROMPT));
-		this.addDialog(new TextPrompt(LAST_NAME_PROMPT, this.nameValidator));
-		this.addDialog(new TextPrompt(FIRST_NAME_PROMPT));
+		this.addDialog(new TextPrompt(LAST_NAME_PROMPT, this.nameValidateAndStore));
+		this.addDialog(new TextPrompt(FIRST_NAME_PROMPT, this.nameValidateAndStore));
 		this.addDialog(new TextPrompt(ADDRESS_PROMPT));
 		this.addDialog(new TextPrompt(PHONE_PROMPT));
 
@@ -97,41 +103,29 @@ class UserProfileDialog extends ComponentDialog {
 		return await step.endDialog();
 	}
 
-
-
 	async getLastName(step) {
 		return await step.prompt(LAST_NAME_PROMPT, "What is your last name?");
 	}
 
+	// Reach out to LUIS twice??
+	// if we make LUIS global we can't properly instantiate model (process env hasn't loaded yet)
 	async getFirstName(step) {
-		// "My last name is _____", grab entity
+		// Doesn't get here until validator passes, so we know entities exist.
 		let result = await this.luisRecognizer.recognize(step.context);
-
-		if (result.entities.Name !== undefined) {
-			let lastName = result.entities.Name[0];
-			// Capitalize first letter, as LUIS sends to lower case.
-			this.userProfile.lastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
-			return await step.prompt(FIRST_NAME_PROMPT, "What is your first name?");
-		} else {
-			// Reprompt? or simple error message? Doesn't work yet.
-			step.context.sendActivity("Sorry, I didn't get that. Please try again.");
-			return await step.prompt(LAST_NAME_PROMPT, "What is your last name?");
-		}
+		let lastName = result.entities.Name[0];
+		// Capitalize first letter, as LUIS sends to lower case.
+		this.userProfile.lastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
+		return await step.prompt(FIRST_NAME_PROMPT, "What is your first name?");
 	}
 
 	async collectAndDisplayName(step) {
+		// Validation happens above so we don't need to validate here.
 		let result = await this.luisRecognizer.recognize(step.context);
+		let firstName = result.entities.Name[0];
+		// Capitalize first letter, as LUIS sends to lower case.
+		this.userProfile.firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
-		if (result.entities.Name !== undefined) {
-			let firstName = result.entities.Name[0];
-			// Capitalize first letter, as LUIS sends to lower case.
-			this.userProfile.firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-		} else {
-			// Reprompt? or simple error message? Doesn't work yet.
-			step.context.sendActivity("Sorry, I didn't get that. Please try again.");
-			return await step.prompt(LAST_NAME_PROMPT, "What is your first name?");
-		}
-
+		// Send details from userProfile properties.
 		await step.context.sendActivity("Hi there, " + this.userProfile.firstName + " " + this.userProfile.lastName + "!");
 		return await step.endDialog();
 	}
