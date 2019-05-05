@@ -18,9 +18,10 @@ const GET_USER_INTENT = "GET_USER_INTENT";
 const INTENT_PROMPT = "INTENT_PROMPT";
 const LAST_NAME_PROMPT = "LAST_NAME_PROMPT";
 const FIRST_NAME_PROMPT = "FIRST_NAME_PROMPT";
-const CONFIRM_PRESCRIPTIONS_PROMPT = "CONFIRM_PRESCRIPTIONS_PROMPT";
 const ADDRESS_PROMPT = "ADDRESS_PROMPT";
 const PHONE_PROMPT = "PHONE_PROMPT";
+const CONFIRM_PROFILE_PROMPT = "CONFIRM_PROFILE_PROMPT";
+const CONFIRM_PRESCRIPTIONS_PROMPT = "CONFIRM_PRESCRIPTIONS_PROMPT";
 
 class UserProfileDialog extends ComponentDialog {
 	constructor(userState) {
@@ -35,8 +36,9 @@ class UserProfileDialog extends ComponentDialog {
 			endpoint: "https://westus.api.cognitive.microsoft.com"
 		});
 
-		// to save userprofile info here need two separaate validators
-		this.nameValidateAndStore = async (step) => {
+		// Create FormValidator class with its own LUIS model to simplify code here
+		// to save userprofile info here need two separate validators
+		this.nameValidate = async (step) => {
 			let result = await this.luisRecognizer.recognize(step.context);
 			if (result.entities.Name !== undefined) {
 				return true;
@@ -46,13 +48,32 @@ class UserProfileDialog extends ComponentDialog {
 			}
 		};
 
+		this.addressValidate = async (step) => {
+			let result = await this.luisRecognizer.recognize(step.context);
+			if (result.entities.Address !== undefined) {
+				return true;
+			} else {
+				await step.context.sendActivity("Sorry, I couldn't find that address. Please try again.");
+				return false;
+			}
+		};
+
+		this.phoneValidate = async (step) => {
+			let result = await this.luisRecognizer.recognize(step.context);
+			if (result.entities.PhoneLastFour) {
+				return true;
+			} else {
+				await step.context.sendActivity("Could not identify valid last four digits of phone number. Please try again.");
+			}
+		};
+
 		// Register individual prompts that make up our larger Dialog
 		this.addDialog(new TextPrompt(INTENT_PROMPT));
-		this.addDialog(new TextPrompt(LAST_NAME_PROMPT, this.nameValidateAndStore));
-		this.addDialog(new TextPrompt(FIRST_NAME_PROMPT, this.nameValidateAndStore));
-		this.addDialog(new TextPrompt(ADDRESS_PROMPT));
+		this.addDialog(new TextPrompt(LAST_NAME_PROMPT, this.nameValidate));
+		this.addDialog(new TextPrompt(FIRST_NAME_PROMPT, this.nameValidate));
+		this.addDialog(new TextPrompt(ADDRESS_PROMPT, this.addressValidate));
+		this.addDialog(new TextPrompt(PHONE_PROMPT, this.phoneValidate));
 		this.addDialog(new TextPrompt(CONFIRM_PRESCRIPTIONS_PROMPT));
-		this.addDialog(new TextPrompt(PHONE_PROMPT));
 
 		this.addDialog(new WaterfallDialog(GET_USER_INTENT, [
 			this.getIntent.bind(this),
@@ -65,6 +86,7 @@ class UserProfileDialog extends ComponentDialog {
 			this.getFirstName.bind(this),
 			this.getAddress.bind(this),
 			this.getPhone.bind(this),
+			this.summarizeTransaction.bind(this),
 			this.confirmPrescriptions.bind(this),
 			this.checkout.bind(this)
 		]));
@@ -101,6 +123,12 @@ class UserProfileDialog extends ComponentDialog {
 			case "SpeakToPharmacist":
 				await step.context.sendActivity("Got it, someone will be with you right away.");
 				break;
+			// Won't actually ever restart at this point in the conversation flow, but add a check in each step
+			// case "Restart":
+			// 	await step.context.sendActivity("Sure, let's try that again.");
+			// 	await step.endDialog();
+			// 	await step.beginDialog(GET_USER_INTENT);
+			// 	break;
 			default:
 				await step.context.sendActivity("Sorry, I didn't understand that.");
 				break;
@@ -123,25 +151,20 @@ class UserProfileDialog extends ComponentDialog {
 		return await step.prompt(FIRST_NAME_PROMPT, "What is your first name?");
 	}
 
-	async collectAndDisplayName(step) {
-		// Validation happens above so we don't need to validate here.
-		let result = await this.luisRecognizer.recognize(step.context);
-		let firstName = result.entities.Name[0];
-		// Capitalize first letter, as LUIS sends to lower case.
-		this.userProfile.firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-
-		// Send details from userProfile properties.
-    await step.context.sendActivity("Hi there, " + this.userProfile.firstName + " " + this.userProfile.lastName + "!");
-  }
-  
-  async getAddress(step) {
+	async getAddress(step) {
+		// LUIS
 		this.userProfile.firstName = step.result;
-		return await step.prompt(ADDRESS_PROMPT, "Can you please validate the address on the account?");
+		return await step.prompt(ADDRESS_PROMPT, "What is the address on the account?");
 	}
 
 	async getPhone(step) {
 		this.userProfile.address = step.result;
 		return await step.prompt(PHONE_PROMPT, "Please provide the last 4 digits of the phone number on the account.");
+	}
+
+	async summarizeTransaction(step) {
+		await step.context.sendActivity("Thank you. I have the following information.");
+		await step.context.sendActivity("Full Name: " + this.userProfile.firstName + " " + this.userProfile.lastName + "\nHome Address: " + this.userProfile.address + "\nPhone Number: (XXX) XXX-" + this.userProfile.phone);
 	}
 
 	async confirmPrescriptions(step) {
@@ -150,7 +173,8 @@ class UserProfileDialog extends ComponentDialog {
 	}
 
 	async checkout(step) {
-		await step.context.sendActivity("Your total is $215. Please put your payment in the pin and press the send button.");
+		await step.context.sendActivity("Great. I see you have three prescriptions ready for pickup:\nVicodin\t$50\nCodeine\t$29\nTylenol 3\t$19");
+		await step.context.sendActivity("A pharmacist will be right with you to give you your order, please have your payment ready.");
 		return await step.endDialog();
 	}
 }
