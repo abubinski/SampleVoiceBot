@@ -40,7 +40,7 @@ class UserProfileDialog extends ComponentDialog {
 			if (result.entities.Name !== undefined) {
 				return true;
 			} else {
-				await step.context.sendActivity("Sorry, I didn't understand that. Please try again.");
+				await step.context.sendActivity("Sorry, I didn't understand that. Can you please spell it for me?");
 				return false;
 			}
 		};
