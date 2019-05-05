@@ -72,6 +72,7 @@ class UserProfileDialog extends ComponentDialog {
 		return await step.prompt(INTENT_PROMPT, "How can I help you?");
 	}
 
+	// Info on prompt retry and validation
 	async processIntent(step) {
 		let result = await this.luisRecognizer.recognize(step.context);
 		let intent = LuisRecognizer.topIntent(result);
@@ -95,12 +96,34 @@ class UserProfileDialog extends ComponentDialog {
 	}
 
 	async getFirstName(step) {
-		this.userProfile.lastName = step.result;
-		return await step.prompt(FIRST_NAME_PROMPT, "What is your first name?");
+		// "My last name is _____", grab entity
+		let result = await this.luisRecognizer.recognize(step.context);
+
+		if (result.entities.Name !== undefined) {
+			let lastName = result.entities.Name[0];
+			// Capitalize first letter, as LUIS sends to lower case.
+			this.userProfile.lastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
+			return await step.prompt(FIRST_NAME_PROMPT, "What is your first name?");
+		} else {
+			// Reprompt? or simple error message? Doesn't work yet.
+			step.context.sendActivity("Sorry, I didn't get that. Please try again.");
+			return await step.prompt(LAST_NAME_PROMPT, "What is your last name?");
+		}
 	}
 
 	async collectAndDisplayName(step) {
-		this.userProfile.firstName = step.result;
+		let result = await this.luisRecognizer.recognize(step.context);
+
+		if (result.entities.Name !== undefined) {
+			let firstName = result.entities.Name[0];
+			// Capitalize first letter, as LUIS sends to lower case.
+			this.userProfile.firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+		} else {
+			// Reprompt? or simple error message? Doesn't work yet.
+			step.context.sendActivity("Sorry, I didn't get that. Please try again.");
+			return await step.prompt(LAST_NAME_PROMPT, "What is your first name?");
+		}
+
 		await step.context.sendActivity("Hi there, " + this.userProfile.firstName + " " + this.userProfile.lastName + "!");
 		return await step.endDialog();
 	}
